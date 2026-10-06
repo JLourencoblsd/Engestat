@@ -1,126 +1,142 @@
 # utils/interpretacao.py
-from typing import Optional
-from core.descritiva import EstatisticasDescritivas
+from typing import Optional, Dict, Any, List
 import pandas as pd
+from core.descritiva import EstatisticasDescritivas
 
-# ============================================
-# Funções existentes (mantidas)
-# ============================================
+# ==============================================================================
+# 1. ANÁLISE DESCRITIVA E EXPLORATÓRIA
+# ==============================================================================
 
 def interpretar_cv(cv: Optional[float]) -> str:
-    """Interpreta coeficiente de variação com recomendação técnica"""
+    """
+    Interpreta o Coeficiente de Variação (CV), medindo a dispersão relativa dos dados.
+    """
     if cv is None:
-        return "⚠️ A média é zero, então não conseguimos calcular o nível de variação com essa métrica."
+        return "⚠️ **Não aplicável:** A média é igual a zero, impossibilitando o cálculo da variabilidade relativa."
     
-    if cv < 10:
-        return "🔵 **Dados super consistentes (Baixa Variação):** Seus dados são muito parecidos entre si. O processo parece bem controlado."
-    elif cv < 20:
-        return "🟡 **Variação aceitável (Moderada):** Existem algumas diferenças entre os valores, mas nada muito extremo. É bom ficar de olho."
+    # Normaliza caso o CV venha em escala decimal (0.15) ou percentual (15)
+    cv_percent = cv if cv > 1 else cv * 100
+    
+    if cv_percent < 10:
+        return f"🔵 **Baixa Dispersão / Homogêneo (CV = {cv_percent:.1f}%):** Os dados são muito parecidos entre si e estão bem concentrados ao redor da média. O processo demonstra alto grau de controle."
+    elif cv_percent <= 20:
+        return f"🟡 **Moderada Dispersão (CV = {cv_percent:.1f}%):** Existe uma oscilação aceitável dos valores. O processo apresenta estabilidade razoável sem desvios excessivos."
     else:
-        return "🔴 **Muita bagunça (Alta Variação):** Seus dados estão oscilando demais! O processo é instável e pouco previsível."
+        return f"🔴 **Alta Dispersão / Heterogêneo (CV = {cv_percent:.1f}%):** Os dados oscilam bastante em relação à média. Indica alta instabilidade no processo ou grande variabilidade natural."
+
 
 def interpretar_distribuicao(media: float, mediana: float) -> str:
-    """Analisa simetria da distribuição"""
+    """
+    Avalia a simetria da distribuição comparando Média e Mediana.
+    """
     if media == 0:
-        return "📊 A média é zero, não é possível avaliar a balança dos dados."
+        return "📊 A média é zero, impossibilitando a análise de diferença relativa."
     
     diferenca_relativa = abs(media - mediana) / abs(media)
     
-    if diferenca_relativa < 0.1:
-        return "⚖️ **Bem equilibrado (Simétrico):** A maioria dos dados está no meio, sem pender muito nem para valores altos, nem para baixos."
+    if diferenca_relativa < 0.05:
+        return "⚖️ **Distribuição Simétrica:** Média e mediana possuem valores muito próximos. Os dados distribuem-se de forma equilibrada em torno do centro."
     elif media > mediana:
-        return "📈 **Puxado para cima:** A maioria dos resultados é baixa, mas existem alguns valores tão altos que estão 'puxando' sua média para cima."
+        return "📈 **Assimetria Positiva (à direita):** A média é maior que a mediana. Isso ocorre quando existem alguns valores extremamente altos (cauda longa à direita) que 'puxam' a média para cima."
     else:
-        return "📉 **Puxado para baixo:** A maioria dos resultados é alta, mas existem alguns valores tão baixos que estão 'puxando' sua média para baixo."
+        return "📉 **Assimetria Negativa (à esquerda):** A média é menor que a mediana. Isso ocorre quando existem alguns valores extremamente baixos (cauda longa à esquerda) que 'puxam' a média para baixo."
+
 
 def interpretar_outliers(percentual_outliers: float) -> str:
-    """Interpreta presença de outliers"""
+    """
+    Interpreta a presença e o impacto de valores discrepantes (outliers).
+    """
     if percentual_outliers == 0:
-        return "✅ **Tudo nos conformes:** Não achamos nenhum 'ponto fora da curva' (outlier)."
+        return "✅ **Sem Outliers:** Nenhuma observação discrepante foi detectada pelos critérios estatísticos."
     elif percentual_outliers < 5:
-        return f"⚠️ **Atenção ({percentual_outliers:.1f}% de dados estranhos):** Encontramos alguns valores muito diferentes do resto. Vale a pena checar se foi erro de medição ou se são reais."
+        return f"⚠️ **Presença Leve de Outliers ({percentual_outliers:.1f}% dos dados):** Foram identificados poucos pontos fora do padrão. Recomenda-se checar se foram erros de digitação/medição ou eventos raros legítimos."
     else:
-        return f"🔴 **Alerta Vermelho ({percentual_outliers:.1f}% de dados estranhos):** Tem muita coisa fora do padrão! É altamente recomendável revisar como esses dados foram coletados."
+        return f"🔴 **Elevada Presença de Outliers ({percentual_outliers:.1f}% dos dados):** Uma parcela significativa dos dados está fora do padrão esperável. Tais observações podem distorcer a média e o desvio-padrão."
+
 
 def gerar_relatorio_completo(est: EstatisticasDescritivas, percentual_outliers: float) -> str:
-    """Gera relatório técnico completo a partir do objeto EstatisticasDescritivas"""
+    """
+    Sintetiza as estatísticas descritivas em um laudo técnico e pedagógico.
+    """
+    cv_val = est.coeficiente_variacao if est.coeficiente_variacao is not None else 0.0
+    cv_percent = cv_val if cv_val > 1 else cv_val * 100
+
     relatorio = f"""
-### 📋 Laudo dos seus Dados
+### 📋 Laudo Descritivo da Amostra
 
-**Quantos dados temos:** {est.n} observações (linhas)  
-**Onde está o meio:** Em média, o valor é {est.media:.2f} (mas o valor exato do meio é {est.mediana:.2f})  
-**O tamanho da oscilação:** Em média, os dados fogem {est.desvio_padrao:.2f} para mais ou para menos.  
+* **Tamanho da Amostra ($n$):** {est.n} observações
+* **Média (Ponto de Equilíbrio):** {est.media:.2f}
+* **Mediana / Q2 (Ponto Central):** {est.mediana:.2f} (exactamente 50% dos dados estão abaixo e 50% acima deste valor)
+* **Desvio-Padrão (Grau de Oscilação):** {est.desvio_padrao:.2f} (afastamento típico dos dados em relação à média)
 
-**Raio-X (Mínimo ao Máximo):** Começa em {est.minimo:.2f} ➔ Passa por {est.q1:.2f} (25%) ➔ Meio em {est.mediana:.2f} (50%) ➔ Chega a {est.q3:.2f} (75%) ➔ Termina em {est.maximo:.2f}  
+**Mapeamento de Quantis:**
+Mínimo ({est.minimo:.2f}) ➔ Q1/25% ({est.q1:.2f}) ➔ Mediana/50% ({est.mediana:.2f}) ➔ Q3/75% ({est.q3:.2f}) ➔ Máximo ({est.maximo:.2f})
 
-**O que o software concluiu:**
+**Diagnóstico Estatístico:**
 • {interpretar_cv(est.coeficiente_variacao)}
 • {interpretar_distribuicao(est.media, est.mediana)}
 • {interpretar_outliers(percentual_outliers)}
 
-**Dica de ouro do App:** {"Os dados estão bem comportados! Você pode usar ferramentas estatísticas tradicionais sem medo." if est.coeficiente_variacao and est.coeficiente_variacao < 20 else "Os dados estão muito instáveis. Talvez você precise 'limpar' pontos fora da curva ou usar testes especiais (não-paramétricos)."}
+**Recomendação Prática:**
+{"✓ Os dados apresentam boa estabilidade. As métricas tradicionais (média e desvio-padrão) são representativas e confiáveis para modelagem." if cv_percent <= 20 and percentual_outliers < 5 else "⚠️ A amostra possui alta variabilidade ou presença de outliers. Recomenda-se utilizar a mediana e o intervalo interquartílico (IQR) como medidas centrais mais robustas, além de verificar a normalidade antes de aplicar testes paramétricos."}
     """
-    return relatorio
+    return relatorio.strip()
 
-# ============================================
-# Funções para Testes de Normalidade
-# ============================================
+
+# ==============================================================================
+# 2. TESTES DE NORMALIDADE
+# ==============================================================================
 
 def interpretar_normalidade(pvalor: float, teste_nome: str = "") -> str:
     """
-    Interpreta o p-valor de um teste de normalidade.
-    
-    Args:
-        pvalor: p-valor obtido no teste
-        teste_nome: nome do teste (opcional, para personalizar a mensagem)
-    
-    Returns:
-        String com interpretação
+    Interpreta o p-valor de testes de normalidade (Shapiro-Wilk, Lilliefors, Qui-Quadrado).
     """
+    nome_str = f" no teste {teste_nome}" if teste_nome else ""
     if pvalor > 0.05:
-        return f"🔵 **Dados com comportamento previsível (p={pvalor:.4f}):** Eles seguem a famosa Curva Normal (formato de sino). Isso é ótimo, facilita muito as próximas análises!"
+        return (
+            f"🔵 **Hipótese de Normalidade Mantida (p = {pvalor:.4f}{nome_str}):**\n"
+            f"Como o p-valor é maior que 0,05, **não há evidências estatísticas para rejeitar a normalidade**. "
+            f"Podemos assumir que os dados seguem uma Distribuição Normal (curva em formato de sino)."
+        )
     else:
-        return f"🔴 **Dados sem padrão normal (p={pvalor:.4f}):** Eles não formam o tradicional 'Sino'. Não tem problema, mas teremos que usar ferramentas específicas para lidar com eles."
+        return (
+            f"🔴 **Afastamento da Normalidade (p = {pvalor:.4f}{nome_str}):**\n"
+            f"Como o p-valor é menor ou igual a 0,05, **rejeita-se a hipótese de normalidade**. "
+            f"Existe evidência estatística de que os dados não seguem uma distribuição normal clássica."
+        )
+
 
 def recomendar_teste(p_normal: bool) -> str:
     """
-    Recomenda testes paramétricos ou não paramétricos com base na normalidade.
-    
-    Args:
-        p_normal: True se os dados são normais, False caso contrário.
-    
-    Returns:
-        String com recomendação.
+    Recomenda as técnicas inferenciais adequadas com base na aderência à normalidade.
     """
     if p_normal:
         return (
-            "✅ **Próximos passos sugeridos:** Como seus dados são 'normais', você pode usar as vias expressas da estatística:\n"
-            "- Comparar 2 grupos? Use o **Teste t** (Teste t de Student)\n"
-            "- Comparar 3 ou mais grupos? Use a **ANOVA**\n"
-            "- Calcular margens de segurança usando a distribuição t"
+            "✅ **Recomendação de Testes (Métodos Paramétricos):**\n"
+            "Como o pressuposto de normalidade foi atendido, você pode utilizar métodos paramétricos de maior poder estatístico:\n"
+            "• **Comparar 2 Grupos Independentes:** Teste t de Student (ou Teste t de Welch se as variâncias forem desiguais)\n"
+            "• **Comparar 2 Grupos Pareados (Antes/Depois):** Teste t Pareado\n"
+            "• **Comparar 3 ou mais Grupos:** Análise de Variância (ANOVA de 1 Fator)\n"
+            "• **Modelagem Linear:** Regressão por Mínimos Quadrados Ordinários (MQO)"
         )
     else:
         return (
-            "⚠️ **Próximos passos sugeridos:** Como seus dados fugiram do padrão normal, precisaremos usar métodos 'todo-terreno':\n"
-            "- Comparar 2 grupos? Use o **Teste de Mann-Whitney**\n"
-            "- Comparar a mesma peça antes e depois? Use o **Teste de Wilcoxon**\n"
-            "- Comparar vários grupos? Use o **Teste de Kruskal-Wallis**"
+            "⚠️ **Recomendação de Testes (Métodos Não-Paramétricos):**\n"
+            "Como os dados não seguem uma distribuição normal, recomenda-se usar métodos livres de distribuição (baseados em postos/ordenamento):\n"
+            "• **Comparar 2 Grupos Independentes:** Teste U de Mann-Whitney\n"
+            "• **Comparar 2 Grupos Pareados (Antes/Depois):** Teste de Wilcoxon\n"
+            "• **Comparar 3 ou mais Grupos:** Teste de Kruskal-Wallis\n"
+            "• **Alternativa:** Aplicar transformações de dados (ex: Logaritmo) antes de refazer o teste"
         )
 
-# ============================================
-# Funções para Comparação de Distribuições
-# ============================================
 
-def interpretar_melhor_distribuicao(resultados, criterio="AIC") -> str:
+# ==============================================================================
+# 3. COMPARAÇÃO E AJUSTE DE DISTRIBUIÇÕES
+# ==============================================================================
+
+def interpretar_melhor_distribuicao(resultados: List[Dict[str, Any]], criterio: str = "AIC") -> str:
     """
-    Retorna texto interpretativo sobre a melhor distribuição ajustada.
-    
-    Args:
-        resultados: lista de dicionários retornada por ajustar_distribuicoes
-        criterio: 'AIC' ou 'BIC'
-    
-    Returns:
-        String com interpretação.
+    Indica qual distribuição teórica obteve o melhor ajuste aos dados.
     """
     if not resultados:
         return "Sem resultados para análise."
@@ -128,103 +144,168 @@ def interpretar_melhor_distribuicao(resultados, criterio="AIC") -> str:
     melhor = min(resultados, key=lambda r: r[criterio])
     nome = melhor["Distribuição"]
     
-    texto = f"✅ **O molde perfeito:** De todas as curvas que o app testou, a que melhor 'veste' os seus dados é a distribuição **{nome}**.\n\n"
-    texto += f"*(O critério usado foi o {criterio}. Quanto menor esse valor, melhor o ajuste matematicamente falando).* "
-    return texto
+    return (
+        f"✅ **Distribuição de Melhor Ajuste:** A curva **{nome}** apresentou o melhor desempenho segundo o critério **{criterio}**.\n\n"
+        f"*(Nota Metodológica: O {criterio} equilibra a precisão do ajuste com a simplicidade do modelo. Quanto **menor** esse valor, melhor o ajuste teórica e praticamente).* "
+    )
 
-def interpretar_comparacao_distribuicoes(resultados) -> str:
+
+def interpretar_comparacao_distribuicoes(resultados: List[Dict[str, Any]]) -> str:
     """
-    Gera um resumo comparativo simples das distribuições ajustadas.
-    
-    Args:
-        resultados: lista de dicionários retornada por ajustar_distribuicoes
-    
-    Returns:
-        String com tabela textual e observações.
+    Gera um comparativo detalhado das distribuições ajustadas usando AIC e BIC.
     """
-    linhas = ["**Resumo dos testes de formato:**"]
+    if not resultados:
+        return "Sem dados disponíveis."
+
+    linhas = ["**Resumo Comparativo de Modelos Probabilísticos:**"]
     for r in resultados:
-        ad = f"{r['AD_Stat']:.4f}" if r['AD_Stat'] else "N/A"
-        linhas.append(
-            f"- **{r['Distribuição']}**: Margens de erro (AIC={r['AIC']:.2f}, BIC={r['BIC']:.2f})"
-        )
+        ad = f" (AD = {r['AD_Stat']:.4f})" if 'AD_Stat' in r and r['AD_Stat'] is not None else ""
+        linhas.append(f"• **{r['Distribuição']}**: AIC = {r['AIC']:.2f} | BIC = {r['BIC']:.2f}{ad}")
     
-    # Identifica a melhor por AIC e BIC
     melhor_aic = min(resultados, key=lambda r: r["AIC"])
     melhor_bic = min(resultados, key=lambda r: r["BIC"])
     
     linhas.append("")
-    linhas.append(f"🏆 **Vencedora pelo critério AIC:** {melhor_aic['Distribuição']}")
-    linhas.append(f"🏆 **Vencedora pelo critério BIC:** {melhor_bic['Distribuição']}")
+    linhas.append(f"🏆 **Vencedora pelo critério AIC (Akaike):** {melhor_aic['Distribuição']} (Valor = {melhor_aic['AIC']:.2f})")
+    linhas.append(f"🏆 **Vencedora pelo critério BIC (Bayesiano):** {melhor_bic['Distribuição']} (Valor = {melhor_bic['BIC']:.2f})")
     
+    if melhor_aic['Distribuição'] == melhor_bic['Distribuição']:
+        linhas.append(f"\n💡 **Conclusão Unânime:** Ambos os critérios confirmam a distribuição **{melhor_aic['Distribuição']}** como o modelo ideal para seus dados.")
+    else:
+        linhas.append("\n💡 **Observação:** O critério BIC penaliza modelos com mais parâmetros de forma mais rigorosa. Em caso de divergência, adote a distribuição mais simples e fisicamente coerente com seu problema.")
+
     return "\n".join(linhas)
 
-# ============================================
-# Funções para Estimação
-# ============================================
+
+# ==============================================================================
+# 4. INTERVALOS DE CONFIANÇA (ESTIMAÇÃO)
+# ==============================================================================
 
 def interpretar_ic_media(res: dict) -> str:
-    return (f"**Margem de Segurança da {res['parametro']}** \n"
-            f"A média amostral que você calculou é {res['media']:.3f}.  \n"
-            f"🎯 **O que isso significa:** Levando em conta sua amostra (n={res['n']}), o software garante com {100*(1-res['alpha']):.0f}% de certeza que a verdadeira média de toda a população do seu problema está entre **[{res['li']:.3f} e {res['ls']:.3f}]**.")
+    conf = 100 * (1 - res['alpha'])
+    return (
+        f"**Intervalo de Confiança para a Média Populacional (μ)**\n"
+        f"• Média Amostral ($\bar{{x}}$): {res['media']:.4f} (calculada para $n = {res['n']}$ observações)\n"
+        f"• Nível de Confiança: **{conf:.0f}%**\n"
+        f"• Intervalo Estimado: **[{res['li']:.4f} ; {res['ls']:.4f}]**\n\n"
+        f"🎯 **O que significa:** Se repetirmos a coleta da amostra muitas vezes nas mesmas condições, "
+        f"em **{conf:.0f}%** desses cenários a verdadeira média da população ($\mu$) estará dentro do intervalo **[{res['li']:.4f} ; {res['ls']:.4f}]**."
+    )
+
 
 def interpretar_ic_desvio(res: dict) -> str:
-    texto = (f"**Margem de Segurança do {res['parametro']} (Oscilação)** \n"
-             f"O desvio amostral encontrado foi {res['S']:.3f}.  \n"
-             f"🎯 **O que isso significa:** Temos {100*(1-res['alpha']):.0f}% de certeza que a variação real do processo inteiro está entre **[{res['li']:.3f} e {res['ls']:.3f}]**.")
-    if 'aprox_normal' in res:
+    conf = 100 * (1 - res['alpha'])
+    texto = (
+        f"**Intervalo de Confiança para o Desvio-Padrão Populacional (σ)**\n"
+        f"• Desvio-Padrão Amostral ($s$): {res['S']:.4f}\n"
+        f"• Nível de Confiança: **{conf:.0f}%**\n"
+        f"• Intervalo Estimado: **[{res['li']:.4f} ; {res['ls']:.4f}]**\n\n"
+        f"🎯 **O que significa:** Temos {conf:.0f}% de confiança de que a variabilidade real (desvio-padrão $\sigma$) de toda a população situa-se entre **{res['li']:.4f}** e **{res['ls']:.4f}**."
+    )
+    if 'aprox_normal' in res and res['aprox_normal']:
         an = res['aprox_normal']
-        texto += f"\n\n**Como você tem muitos dados (n>30), o intervalo ajustado é:** [{an['li']:.3f} e {an['ls']:.3f}]"
+        texto += f"\n\n*(Aproximação assintótica/normal para grandes amostras $n>30$: [{an['li']:.4f} ; {an['ls']:.4f}]).*"
     return texto
 
-def interpretar_ic_variancia(res: dict) -> str:
-    return (f"**Margem de Segurança da {res['parametro']}** \n"
-            f"A variância da sua amostra é {res['S2']:.3f}.  \n"
-            f"🎯 **O que isso significa:** Temos {100*(1-res['alpha']):.0f}% de certeza que a variância real do problema todo está entre **[{res['li']:.3f} e {res['ls']:.3f}]**.")
 
-# ============================================
-# Funções para Comparação de 2 Amostras
-# ============================================
+def interpretar_ic_variancia(res: dict) -> str:
+    conf = 100 * (1 - res['alpha'])
+    return (
+        f"**Intervalo de Confiança para a Variância Populacional (σ²)**\n"
+        f"• Variância Amostral ($s^2$): {res['S2']:.4f}\n"
+        f"• Nível de Confiança: **{conf:.0f}%**\n"
+        f"• Intervalo Estimado: **[{res['li']:.4f} ; {res['ls']:.4f}]**\n\n"
+        f"🎯 **O que significa:** Temos {conf:.0f}% de confiança de que a variância real ($\sigma^2$) de todo o processo está contida nos limites **[{res['li']:.4f} ; {res['ls']:.4f}]**."
+    )
+
+
+# ==============================================================================
+# 5. COMPARAÇÃO DE 2 AMOSTRAS
+# ==============================================================================
 
 def interpretar_teste_f(res_f: dict) -> str:
-    conc = "✅ **IGUAIS** (As duas amostras oscilam com a mesma intensidade)" if not res_f['rejeita_h0'] else "⚠️ **DIFERENTES** (Uma amostra varia muito mais que a outra)"
-    return (f"**Comparação do nível de 'bagunça' (Teste F de Variâncias)** \n"
-            f"Tirando a prova real (p-valor = {res_f['p_valor']:.4f}):  \n"
-            f"Conclusão: Para a estatística, as variâncias são {conc}.")
+    p_val = res_f['p_valor']
+    if res_f['rejeita_h0']:
+        conc = "⚠️ **VARIÂNCIAS HETEROGÊNEAS (Heterocedasticidade):** Rejeita-se $H_0$. Há diferença estatisticamente significativa entre a oscilação/dispersão dos dois grupos."
+    else:
+        conc = "✅ **VARIÂNCIAS HOMOGÊNEAS (Homocedasticidade):** Não se rejeita $H_0$. As variâncias dos dois grupos são estatisticamente equivalentes."
+
+    return (
+        f"**Teste F de Homocedasticidade (Igualdade de Variâncias)**\n"
+        f"• p-valor calculado: **{p_val:.4f}** (nível de significância α = 0,05)\n"
+        f"• **Conclusão:** {conc}"
+    )
+
 
 def interpretar_teste_t(res_t: dict) -> str:
-    if res_t['rejeita_h0']:
-        if res_t['media1'] > res_t['media2']:
-            quem = "**Grupo 1** é estatisticamente maior que o Grupo 2"
-        else:
-            quem = "**Grupo 2** é estatisticamente maior que o Grupo 1"
-        conc = f"A diferença é REAL e não foi por acaso. {quem}."
-    else:
-        conc = "⚖️ **Empate Técnico!** As médias podem parecer diferentes no papel, mas para a estatística a diferença é obra do acaso. Considere-as iguais."
+    p_val = res_t['p_valor']
+    m1, m2 = res_t['media1'], res_t['media2']
     
-    return (f"**Duelo de Médias (Teste t)** \n"
-            f"Tirando a prova real (p-valor = {res_t['p_valor']:.4f}):  \n"
-            f"Conclusão: {conc}")
+    if res_t['rejeita_h0']:
+        maior = "Grupo 1" if m1 > m2 else "Grupo 2"
+        conc = (
+            f"⚠️ **DIFERENÇA ESTATISTICAMENTE SIGNIFICATIVA:** Rejeita-se a hipótese nula ($H_0$). "
+            f"A média do **{maior}** ({max(m1, m2):.2f}) é estatisticamente superior à outra (p = {p_val:.4f}). "
+            f"A diferença observada não ocorreu por mero acaso."
+        )
+    else:
+        conc = (
+            f"⚖️ **DIFERENÇA NÃO SIGNIFICATIVA (Empate Técnico):** Não se rejeita a hipótese nula ($H_0$). "
+            f"Embora haja uma pequena variação entre as médias amostrais ({m1:.2f} vs {m2:.2f}), ela é atribuível à flutuação amostragem aleatória (p = {p_val:.4f} > 0,05)."
+        )
 
-# ============================================
-# Funções para ANOVA e Tukey
-# ============================================
+    return (
+        f"**Teste t de Student para Comparação de Médias**\n"
+        f"• p-valor calculado: **{p_val:.4f}**\n"
+        f"• **Conclusão:** {conc}"
+    )
+
+
+# ==============================================================================
+# 6. ANOVA E COMPARAÇÕES MÚLTIPLAS (TUKEY)
+# ==============================================================================
 
 def interpretar_anova(res_a: dict) -> str:
+    p_val = res_a['p_valor']
     if res_a['rejeita_h0']:
-        conc = "⚠️ **Tem alguém diferente na sala!** O teste provou que pelo menos um desses grupos não está empatando com o resto."
+        conc = (
+            f"⚠️ **Pelo menos um grupo difere dos demais:** Rejeita-se a hipótese nula ($H_0$). "
+            f"Existe evidência estatística de que ao menos uma das médias populacionais é diferente das outras (p = {p_val:.4f}). "
+            f"Recomenda-se verificar o Teste de Tukey abaixo para descobrir exatamente quais grupos diferem entre si."
+        )
     else:
-        conc = "⚖️ **Empate Geral!** Todos os grupos tiveram resultados tão parecidos que a estatística os considera iguais."
-    
-    return (f"**Comparação de Vários Grupos (ANOVA)** \n"
-            f"Tirando a prova real (p-valor = {res_a['p_valor']:.4f}):  \n"
-            f"Conclusão: {conc}")
+        conc = (
+            f"⚖️ **Sem diferenças significativas entre os tratamentos:** Não se rejeita $H_0$. "
+            f"Todas as médias comparadas são estatisticamente equivalentes ao nível de 5% de significância (p = {p_val:.4f})."
+        )
+
+    return (
+        f"**Análise de Variância (ANOVA de 1 Fator)**\n"
+        f"• p-valor (Estatística F): **{p_val:.4f}**\n"
+        f"• **Conclusão:** {conc}"
+    )
+
 
 def interpretar_tukey(df_tukey: pd.DataFrame) -> str:
     linhas = []
     for _, row in df_tukey.iterrows():
-        if row['Diferença Significativa?']:
-            linhas.append(f"🥊 {row['Grupo A']} vs {row['Grupo B']}: A diferença de {row['Diferença']:.3f} é **REAL** (p-valor = {row['P-valor']:.4f})")
+        # Compatibilidade com colunas personalizadas ou padrões do statsmodels
+        sig = row.get('Diferença Significativa?', False)
+        p_val = row.get('P-valor', row.get('p-adj', 1.0))
+        dif = row.get('Diferença', row.get('meandiff', 0.0))
+        g_a = row.get('Grupo A', row.get('group1', 'A'))
+        g_b = row.get('Grupo B', row.get('group2', 'B'))
+
+        if sig or p_val <= 0.05:
+            linhas.append(f"🥊 **{g_a} vs {g_b}**: Diferença média de {dif:.3f} (Diferença real comprovada, p-valor ajustado = {p_val:.4f})")
+
     if not linhas:
-        return "Após olhar par por par, nenhuma diferença foi conclusiva o suficiente. Todos empatam."
-    return "**Quem é diferente de quem? (Tira-teima de Tukey):** \n" + "\n".join(linhas)
+        return (
+            "**Teste Post-Hoc de Tukey (Comparações Par a Par):**\n"
+            "Após comparar grupo por grupo com ajuste de probabilidade, nenhuma diferença foi conclusiva. Todos empatam estatisticamente."
+        )
+
+    return (
+        "**Teste Post-Hoc de Tukey (Identificação das Diferenças):**\n" +
+        "\n".join(linhas)
+    )
